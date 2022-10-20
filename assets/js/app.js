@@ -44,7 +44,7 @@ var losses = 0;
 var timer = null;
 var timeLeft = 0;
 var currentWordIndex;
-var currentGuess;
+var currentGuess = [];
 
 /*
      4. Declare variables: constants
@@ -63,6 +63,8 @@ var kWordList = [
 ];
 
 var kDuration = 20;
+var kStorageKey = "week-4-activity-28-scores";
+var kAllowedKeys = "abcdefghijklmnopqrstuvwxyz";
 
 /*
      5. Identify events
@@ -83,33 +85,153 @@ var kDuration = 20;
 // Event: Page load
 function init() {
   console.log("Game loading...");
+
+  // retrieve data from persistance
+  var scores = JSON.parse(localStorage.getItem(kStorageKey));
+
+  // Update State
+  if (scores) {
+    wins = scores.wins;
+    losses = scores.losses;
+  }
+
+  // Update the UI
+  updateScoreboard();
 }
 
 // Event: Click start
 function handleClickStart(ev) {
   console.log("Game started!");
+
+  if (!timer) {
+    // set the time left
+    timeLeft = kDuration;
+    // start a timer
+    timer = setInterval(handleTimerTick, 1000);
+    // choose a word from our list
+    currentWordIndex = Math.floor(Math.random() * kWordList.length);
+    // set the current guess
+    currentGuess = new Array(kWordList[currentWordIndex].length).fill("_");
+
+    timerEl.textContent = timeLeft;
+
+    // hide the start button
+    hideElement(controlsEl);
+    /////////////////////////////////////////
+    // Reset the display
+    // hide any result message
+    hideElement(gameResultEl);
+    // show gameboard
+    showElement(gameboardEl);
+    // show timer
+    showElement(timerEl);
+    // show the word display
+    updateWordDisplay();
+  }
 }
 startGameButtonEl.addEventListener("click", handleClickStart);
 
 // Event: Timer tick
 function handleTimerTick(ev) {
-  console.log("timer ticked!");
+  timeLeft--;
+  console.log("timer ticked!", timeLeft);
+
+  timerEl.textContent = timeLeft;
+  if (timeLeft === 0) {
+    handleGameEnds(false);
+  }
 }
 
 // Event: Type letter
 function handleKeyDown(ev) {
   console.log("key pressed: ", ev.key);
+
+  if (timer && kAllowedKeys.includes(ev.key)) {
+    // Update state
+    if (
+      !currentGuess.includes(ev.key) &&
+      kWordList[currentWordIndex].includes(ev.key)
+    ) {
+      currentGuess = kWordList[currentWordIndex]
+        .split("")
+        .map(function (letter, index) {
+          if (letter === ev.key) {
+            return letter;
+          }
+
+          return currentGuess[index];
+        });
+    }
+
+    // Update UI
+    updateWordDisplay();
+
+    if (currentGuess.join("") === kWordList[currentWordIndex]) {
+      handleGameEnds(true);
+    }
+  }
 }
 document.addEventListener("keydown", handleKeyDown);
 
 // Event: Game ends
-function handleGameEnds() {}
+function handleGameEnds(didWin) {
+  clearInterval(timer);
+  timer = null;
+
+  // Update state
+  if (didWin) {
+    wins++;
+  } else {
+    losses++;
+  }
+
+  localStorage.setItem(kStorageKey, JSON.stringify({ wins, losses }));
+
+  // Update UI
+
+  displayResult(didWin);
+  updateScoreboard();
+  showElement(controlsEl);
+}
 
 /*
-     6. Refactor
+     6. Refactor - Helper functions
         - identify tasks that can be broken into their own functions, outside the event handlers
         - Are there tasks that more than one event handler share?
 */
+
+function updateScoreboard() {
+  // Update UI
+  winsEl.textContent = wins;
+  lossesEl.textContent = losses;
+}
+
+function hideElement(el) {
+  el.classList.add("hide");
+}
+
+function showElement(el) {
+  el.classList.remove("hide");
+}
+
+function displayResult(didWin) {
+  gameResultEl.classList.remove("success");
+  gameResultEl.classList.remove("failure");
+  hideElement(timerEl);
+
+  if (didWin) {
+    gameResultEl.textContent = "YOU WIN!";
+    gameResultEl.classList.add("success");
+  } else {
+    gameResultEl.textContent = "YOU LOST!";
+    gameResultEl.classList.add("failure");
+  }
+  showElement(gameResultEl);
+}
+
+function updateWordDisplay() {
+  gameDisplayEl.textContent = currentGuess.join(" ");
+}
 
 // Start the game
 init();
